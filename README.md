@@ -6,7 +6,7 @@ MCP gave Claude the hands. MAP gives Claude the receipt.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/Tests-56%2F56-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-58%2F58-brightgreen.svg)]()
 
 ---
 
@@ -200,7 +200,7 @@ await map.execute('Migrate pricing', 'updatePrice', { customerId: 'acme', price:
 
 // 6. Rollback if needed
 const ledger = map.getLedger();
-map.rollbackTo(ledger[0].id);
+await map.rollbackTo(ledger[0].id);
 
 // 7. Export for audit
 const audit = map.exportLedger();
@@ -423,8 +423,8 @@ map.on((event) => {
 | `connectState(getState, setState)` | Connect to your environment |
 | `execute(goal, tool, input)` | Execute one action with full provenance |
 | `run(goal, actions[])` | Execute a sequence |
-| `rollbackTo(entryId)` | Revert to a specific point |
-| `rollbackToSafe()` | Revert to last known good state |
+| `await rollbackTo(entryId)` | Revert to a specific point (async — calls tool.restore() for RESTORE tools) |
+| `await rollbackToSafe()` | Revert to last known good state |
 | `getLedger()` | Get all entries |
 | `exportLedger()` | Export audit-ready JSON |
 | `verifyIntegrity()` | Verify hash chain |
@@ -532,7 +532,7 @@ The strategy:
 npm test
 ```
 
-10 tests covering: ledger chaining, tamper detection, critic integration (PASS/CORRECTED/FLAGGED), auto-correction, state rollback, provenance of undo, audit export, event emission, sequence execution.
+58 tests covering: ledger chaining, tamper detection, critic integration (PASS/CORRECTED/FLAGGED), auto-correction, ESCALATE execution gating, RESTORE capture/restore lifecycle, state rollback, provenance of undo, audit export, event emission, sequence execution, tiered critic routing, custom risk classifiers, learning engine (rule extraction, fine-tuning export, agent memory), tool builders, serialization edge cases, and chain verification.
 
 ---
 

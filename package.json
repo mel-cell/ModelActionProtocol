@@ -2,10 +2,18 @@
   "name": "@model-action-protocol/core",
   "version": "0.1.0",
   "description": "MAP (Model Action Protocol) — Cryptographic provenance, self-healing, and state rollback for autonomous AI agents",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "files": [
-    "dist"
+    "dist",
+    "!dist/__tests__"
   ],
   "scripts": {
     "build": "tsc",
@@ -23,6 +31,11 @@
   ],
   "author": "deadpxl <neil@deadpxl.studio>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NDave27/ModelActionProtocol.git"
+  },
+  "homepage": "https://github.com/NDave27/ModelActionProtocol",
   "dependencies": {
     "zod": "^3.0.0 || ^4.0.0"
   },
