@@ -1,7 +1,7 @@
 // =============================================================================
 // MAP — Main class
 //
-// The public API for @map-protocol/core. Three concepts: register tools, run, rollback.
+// The public API for @model-action-protocol/core. Three concepts: register tools, run, rollback.
 //
 //   const map = new MAP({ executor: 'sonnet', critic: 'haiku' });
 //   map.registerTool('updateRecord', schema, fn);

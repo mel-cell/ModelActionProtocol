@@ -1,12 +1,12 @@
 // =============================================================================
-// @map-protocol/tools-stripe — Pre-built MAP-compliant Stripe tools
+// @model-action-protocol/tools-stripe — Pre-built MAP-compliant Stripe tools
 //
 // Drop-in Stripe tools with reversal schemas already written.
 // Every payment, refund, and subscription action is logged, reviewed,
 // and reversible out of the box.
 //
 // Usage:
-//   import { stripeTools } from '@map-protocol/tools-stripe';
+//   import { stripeTools } from '@model-action-protocol/tools-stripe';
 //   stripeTools.forEach(tool => map.addTool(tool));
 //
 // That's it. Provenance comes for free.
@@ -17,7 +17,7 @@ import {
   defineRestoreTool,
   defineCompensateTool,
   defineEscalateTool,
-} from "@map-protocol/core";
+} from "@model-action-protocol/core";
 
 // ─── Charge a customer ──────────────────────────────────────────────────────
 // Strategy: COMPENSATE — charges are reversed via refunds, not state restore

@@ -1,4 +1,4 @@
-# @map-protocol/core
+# @model-action-protocol/core
 
 **MAP (Model Action Protocol) — Cryptographic provenance, self-healing, and state rollback for autonomous AI agents.**
 
@@ -135,7 +135,7 @@ MCP defines how agents read the world. MAP defines how agents safely write to it
 ## Installation
 
 ```bash
-npm install @map-protocol/core
+npm install @model-action-protocol/core
 ```
 
 **Requirements:** Node.js 20+, TypeScript 5.7+
@@ -145,7 +145,7 @@ npm install @map-protocol/core
 ## Quick Start
 
 ```typescript
-import { MAP, createRuleCritic } from '@map-protocol/core';
+import { MAP, createRuleCritic } from '@model-action-protocol/core';
 import { z } from 'zod';
 
 // Your state
@@ -218,14 +218,14 @@ Instead of writing reversal schemas from scratch, use pre-built MAP-compliant to
 
 ```typescript
 // Drop in Stripe tools — provenance comes for free
-import { stripeTools } from '@map-protocol/tools-stripe';
+import { stripeTools } from '@model-action-protocol/tools-stripe';
 stripeTools.forEach(tool => map.addTool(tool));
 ```
 
 Build tools with typed reversal strategies:
 
 ```typescript
-import { defineRestoreTool, defineCompensateTool, defineEscalateTool } from '@map-protocol/core';
+import { defineRestoreTool, defineCompensateTool, defineEscalateTool } from '@model-action-protocol/core';
 
 // RESTORE: auto-capture state before write, restore on rollback
 const updateCustomer = defineRestoreTool({
@@ -254,18 +254,18 @@ const wireTransfer = defineEscalateTool({
 ```
 
 **Planned tool packages:**
-- `@map-protocol/tools-stripe` — payments, refunds, subscriptions (example included)
-- `@map-protocol/tools-salesforce` — CRM operations
-- `@map-protocol/tools-netsuite` — ERP/GL operations
-- `@map-protocol/tools-hubspot` — marketing automation
-- `@map-protocol/tools-aws` — infrastructure operations
+- `@model-action-protocol/tools-stripe` — payments, refunds, subscriptions (example included)
+- `@model-action-protocol/tools-salesforce` — CRM operations
+- `@model-action-protocol/tools-netsuite` — ERP/GL operations
+- `@model-action-protocol/tools-hubspot` — marketing automation
+- `@model-action-protocol/tools-aws` — infrastructure operations
 
 ---
 
 ## Using an LLM Critic (Production)
 
 ```typescript
-import { MAP, createLLMCritic } from '@map-protocol/core';
+import { MAP, createLLMCritic } from '@model-action-protocol/core';
 import { generateText } from 'ai';
 
 const critic = createLLMCritic({
@@ -290,7 +290,7 @@ Every CORRECTED verdict, every FLAGGED action, every human Approve/Reject decisi
 After N identical corrections, the system proposes a new deterministic rule. No LLM needed for that check anymore — it becomes a microsecond gate.
 
 ```typescript
-import { LearningEngine } from '@map-protocol/core';
+import { LearningEngine } from '@model-action-protocol/core';
 
 const engine = new LearningEngine();
 
@@ -311,7 +311,7 @@ const learnedCritic = engine.toRuleCritic();
 
 // Plug into tiered critic — learned rules run first (microseconds),
 // LLM only fires for patterns the rules haven't seen yet
-import { createTieredCritic } from '@map-protocol/core';
+import { createTieredCritic } from '@model-action-protocol/core';
 
 const tieredCritic = createTieredCritic({
   low: learnedCritic,                                                  // μs — learned rules
@@ -474,7 +474,7 @@ Human Supervisor (one person, many agents)
     │
     ▼
 ┌──────────────────────────────────────────────────┐
-│               @map-protocol/core                 │
+│               @model-action-protocol/core                 │
 │                                                  │
 │  ┌──────────┐  ┌────────┐  ┌────────────────┐   │
 │  │ Executor │→ │ Critic │→ │    Ledger      │   │

@@ -1,5 +1,5 @@
 // =============================================================================
-// @map-protocol/core — MAP (Model Action Protocol)
+// @model-action-protocol/core — MAP (Model Action Protocol)
 //
 // Cryptographic provenance, self-healing, and state rollback
 // for autonomous AI agents.

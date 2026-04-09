@@ -1,4 +1,4 @@
-# Contributing to @map-protocol/core
+# Contributing to @model-action-protocol/core
 
 Thanks for your interest in contributing to the Model Action Protocol.
 

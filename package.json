@@ -1,5 +1,5 @@
 {
-  "name": "@map-protocol/core",
+  "name": "@model-action-protocol/core",
   "version": "0.1.0",
   "description": "MAP (Model Action Protocol) — Cryptographic provenance, self-healing, and state rollback for autonomous AI agents",
   "main": "dist/index.js",
@@ -24,16 +24,17 @@
   "author": "deadpxl <neil@deadpxl.studio>",
   "license": "MIT",
   "dependencies": {
-    "ai": ">=6.0.0",
-    "zod": "^4.0.0"
+    "ai": ">=6.0.0"
   },
   "devDependencies": {
     "@types/node": "^25.5.2",
     "typescript": "^5.7.0",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "zod": "^4.0.0"
   },
   "peerDependencies": {
-    "ai": ">=6.0.0"
+    "ai": ">=6.0.0",
+    "zod": "^3.0.0 || ^4.0.0"
   },
   "engines": {
     "node": ">=20"

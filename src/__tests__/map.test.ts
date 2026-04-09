@@ -1,5 +1,5 @@
 // =============================================================================
-// @map-protocol/core — Tests
+// @model-action-protocol/core — Tests
 //
 // Verifies: ledger chaining, critic integration, rollback, chain verification
 // =============================================================================
@@ -69,7 +69,7 @@ const testCritic = createRuleCritic([
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
-describe("@map-protocol/core", () => {
+describe("@model-action-protocol/core", () => {
   let map: MAP;
 
   beforeEach(() => {

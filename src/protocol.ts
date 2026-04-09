@@ -98,6 +98,13 @@ export type ActionRecord = z.infer<typeof ActionRecord>;
 // When multiple agents work simultaneously, provenance must track WHO did what,
 // WHO authorized it, and WHO spawned whom. These types enable a single human
 // to supervise a fleet of autonomous agents.
+//
+// NOTE: These types define the MAP wire format for multi-agent provenance.
+// The core library provides the type definitions and carries them in ledger
+// entries, but does NOT enforce identity verification or grant validation
+// at runtime. Implementations that use multi-agent features are responsible
+// for computing and verifying `credentialHash` and `AuthorizationGrant.hash`
+// fields. A reference implementation will be provided in a future release.
 
 // Agent Identity — every agent in the system has a cryptographic identity
 export interface AgentIdentity {
@@ -109,7 +116,11 @@ export interface AgentIdentity {
   ownerDomain: string;
   /** What this agent is authorized to do */
   capabilities: string[];
-  /** SHA-256 hash of the agent's auth credential */
+  /**
+   * SHA-256 hash of the agent's auth credential.
+   * Implementations must compute this externally — the core library
+   * carries but does not verify this field.
+   */
   credentialHash: string;
 }
 
@@ -136,7 +147,11 @@ export interface AuthorizationGrant {
   parentGrantId?: string;
   /** Whether this grant has been revoked */
   revoked?: boolean;
-  /** SHA-256 hash of the grant for tamper-evidence */
+  /**
+   * SHA-256 hash of the grant for tamper-evidence.
+   * Implementations must compute this externally — the core library
+   * carries but does not verify this field.
+   */
   hash: string;
 }
 
