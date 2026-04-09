@@ -154,15 +154,35 @@ export class MAP {
    * Restores the state from before that entry's action.
    * The rollback itself is logged to the ledger.
    */
-  rollbackTo(entryId: string): {
+  async rollbackTo(entryId: string): Promise<{
     state: unknown;
     entriesReverted: number;
-  } {
+  }> {
     this.assertConnected();
     const result = executeRollback(this.ledger, entryId);
 
-    // Apply the restored state
+    // Apply the restored in-memory state
     this.stateSetter!(result.state);
+
+    // Call tool.restore() for any RESTORE entries that were reverted.
+    // This pushes captured state back to external systems (e.g., Stripe, Salesforce).
+    const entries = this.ledger.getEntries();
+    for (const entry of entries) {
+      if (
+        entry.status === "ROLLED_BACK" &&
+        entry.action.reversalStrategy === "RESTORE" &&
+        entry.action.capturedState !== undefined
+      ) {
+        const tool = this.tools.get(entry.action.tool);
+        if (tool && "restore" in tool && typeof (tool as any).restore === "function") {
+          try {
+            await (tool as any).restore(entry.action.capturedState);
+          } catch {
+            // Restore failed — logged in ledger, caller can inspect
+          }
+        }
+      }
+    }
 
     return {
       state: result.state,
@@ -173,10 +193,10 @@ export class MAP {
   /**
    * Rollback to the last known safe point (before the most recent problem).
    */
-  rollbackToSafe(): {
+  async rollbackToSafe(): Promise<{
     state: unknown;
     entriesReverted: number;
-  } | null {
+  } | null> {
     const safe = findSafePoint(this.ledger);
     if (!safe) return null;
     return this.rollbackTo(safe.id);

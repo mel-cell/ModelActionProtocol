@@ -438,7 +438,7 @@ describe("MAP edge cases", () => {
     map.connectState(() => ({ ...state }), (s) => Object.assign(state, s as any));
 
     await map.execute("test", "inc", {});
-    expect(map.rollbackToSafe()).toBeNull();
+    expect(await map.rollbackToSafe()).toBeNull();
   });
 
   it("event listener errors do not crash execution", async () => {
@@ -549,7 +549,7 @@ describe("rollbackToSafe with a problem", () => {
     await map.execute("test", "dangerousAction", {});
 
     // rollbackToSafe should find the flagged entry and roll back
-    const result = map.rollbackToSafe();
+    const result = await map.rollbackToSafe();
     expect(result).not.toBeNull();
     expect(result!.entriesReverted).toBeGreaterThan(0);
     // State should be restored to before the dangerous action
@@ -736,6 +736,76 @@ describe("RESTORE strategy", () => {
     await map.execute("test", "updateRecord", { id: "acme", value: 200 });
 
     expect(calls).toEqual(["capture", "execute"]);
+  });
+
+  it("calls restore on rollback to push state back to external system", async () => {
+    const calls: string[] = [];
+    let restoredWith: unknown = null;
+
+    const map = new MAP(
+      { executor: "test", critic: "test" },
+      createRuleCritic([])
+    );
+
+    const tool = defineRestoreTool({
+      name: "updateRecord",
+      description: "Update a record",
+      inputSchema: z.object({ id: z.string(), value: z.number() }),
+      execute: async (input) => {
+        calls.push("execute");
+        return { updated: true };
+      },
+      capture: async (input) => {
+        calls.push("capture");
+        return { id: input.id, originalValue: 100 };
+      },
+      restore: async (captured) => {
+        calls.push("restore");
+        restoredWith = captured;
+      },
+    });
+    map.addTool(tool);
+
+    const state = { record: { id: "acme", value: 500 } };
+    map.connectState(
+      () => JSON.parse(JSON.stringify(state)),
+      (s) => Object.assign(state, s as any)
+    );
+
+    // Execute a RESTORE tool
+    await map.execute("test", "updateRecord", { id: "acme", value: 200 });
+    expect(calls).toEqual(["capture", "execute"]);
+
+    // Rollback — should call restore() with the captured state
+    const ledger = map.getLedger();
+    await map.rollbackTo(ledger[0].id);
+
+    expect(calls).toEqual(["capture", "execute", "restore"]);
+    expect(restoredWith).toEqual({ id: "acme", originalValue: 100 });
+  });
+
+  it("stores capturedState in the ledger entry", async () => {
+    const map = new MAP(
+      { executor: "test", critic: "test" },
+      createRuleCritic([])
+    );
+
+    const tool = defineRestoreTool({
+      name: "updateRecord",
+      description: "Update",
+      inputSchema: z.object({ id: z.string() }),
+      execute: async () => ({ done: true }),
+      capture: async (input) => ({ id: input.id, savedAt: "2026-01-01" }),
+      restore: async () => {},
+    });
+    map.addTool(tool);
+    map.connectState(() => ({}), () => {});
+
+    await map.execute("test", "updateRecord", { id: "acme" });
+
+    const entry = map.getLedger()[0];
+    expect(entry.action.capturedState).toEqual({ id: "acme", savedAt: "2026-01-01" });
+    expect(entry.action.reversalStrategy).toBe("RESTORE");
   });
 });
 

@@ -197,7 +197,7 @@ describe("@model-action-protocol/core", () => {
 
     // Rollback to before the second update
     const ledger = map.getLedger();
-    map.rollbackTo(ledger[1].id);
+    await map.rollbackTo(ledger[1].id);
 
     // Acme should still be 299 (from first action), Globex should be back to 500
     expect(database.acme.price).toBe(299);
@@ -208,7 +208,7 @@ describe("@model-action-protocol/core", () => {
     await map.execute("Update pricing", "updatePrice", { customerId: "acme", price: 299 });
     const ledger = map.getLedger();
 
-    map.rollbackTo(ledger[0].id);
+    await map.rollbackTo(ledger[0].id);
 
     const updatedLedger = map.getLedger();
     const rollbackEntry = updatedLedger[updatedLedger.length - 1];

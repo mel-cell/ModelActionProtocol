@@ -167,7 +167,11 @@ export async function executeAction(
     (config.autoCorrect ?? true)
   ) {
     // Log the original (incorrect) action first
-    const originalAction: ActionRecord = { tool: toolName, input, output };
+    const originalAction: ActionRecord = {
+      tool: toolName, input, output,
+      reversalStrategy: tool.reversal?.strategy,
+      capturedState,
+    };
     const originalEntry = ledger.append(originalAction, stateBefore, stateAfter, criticResult);
 
     // Apply the correction
@@ -215,7 +219,11 @@ export async function executeAction(
   }
 
   // 6. Log to ledger
-  const action: ActionRecord = { tool: toolName, input, output };
+  const action: ActionRecord = {
+    tool: toolName, input, output,
+    reversalStrategy: tool.reversal?.strategy,
+    capturedState,
+  };
   const entry = ledger.append(action, stateBefore, stateAfter, criticResult);
 
   // 7. Check if we should halt

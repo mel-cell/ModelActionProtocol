@@ -91,6 +91,9 @@ export const ActionRecord = z.object({
   input: z.record(z.string(), z.unknown()),
   output: z.unknown(),
   reversalStrategy: ReversalStrategy.optional(),
+  /** State captured before execution for RESTORE tools (e.g., GET before PUT).
+   *  Stored in the ledger so rollback can call tool.restore() with this value. */
+  capturedState: z.unknown().optional(),
 });
 export type ActionRecord = z.infer<typeof ActionRecord>;
 
