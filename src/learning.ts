@@ -41,6 +41,7 @@
 
 import type { LedgerEntry, ActionRecord } from "./protocol.js";
 import type { CriticFunction } from "./critic.js";
+import { sha256 } from "./snapshot.js";
 
 // ─── Learned Rule ───────────────────────────────────────────────────────────
 
@@ -305,9 +306,9 @@ export class LearningEngine {
   // ─── Internal ───────────────────────────────────────────────────────────
 
   /**
-   * Compute a fingerprint for a correction pattern.
+   * Compute a SHA-256 fingerprint for a correction pattern.
    * Two corrections have the same fingerprint if they're the same type
-   * of mistake on the same tool.
+   * of mistake on the same tool with the same correction target.
    */
   private computeFingerprint(entry: LedgerEntry): string {
     const parts = [
@@ -315,7 +316,6 @@ export class LearningEngine {
       entry.action.tool,
       entry.critic.correction?.tool ?? "none",
     ];
-    // Simple hash — in production use SHA-256
-    return parts.join(":").toLowerCase().replace(/\s+/g, "_");
+    return sha256(parts.join(":"));
   }
 }

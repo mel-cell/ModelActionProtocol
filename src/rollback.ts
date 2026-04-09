@@ -86,19 +86,12 @@ export function findLastProblem(
 }
 
 /**
- * Find the last entry before a problem occurred.
- * This is the entry you'd want to rollback TO.
+ * Find the entry where the most recent problem occurred.
+ * Rolling back TO this entry reverts it and everything after it,
+ * restoring the state from before this entry's action.
  */
 export function findSafePoint(
   ledger: Ledger
 ): LedgerEntry | undefined {
-  const problem = findLastProblem(ledger);
-  if (!problem) return undefined;
-
-  const entries = ledger.getEntries();
-  const problemIdx = entries.findIndex((e) => e.id === problem.id);
-  if (problemIdx <= 0) return undefined;
-
-  // Return the entry before the problem
-  return entries[problemIdx - 1];
+  return findLastProblem(ledger);
 }

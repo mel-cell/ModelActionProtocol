@@ -88,7 +88,7 @@ export async function executeAction(
   }
 
   // Emit action start
-  ledger["emit"]({ type: "action:start", tool: toolName, input });
+  ledger.emit({ type: "action:start", tool: toolName, input });
 
   // 1. Snapshot state before
   const stateBefore = getState();
@@ -123,7 +123,6 @@ export async function executeAction(
   });
 
   // 5. If CORRECTED and autoCorrect is enabled, apply the correction
-  let corrected = false;
   if (
     criticResult.verdict === "CORRECTED" &&
     criticResult.correction &&
@@ -131,16 +130,18 @@ export async function executeAction(
   ) {
     // Log the original (incorrect) action first
     const originalAction: ActionRecord = { tool: toolName, input, output };
-    ledger.append(originalAction, stateBefore, stateAfter, criticResult);
+    const originalEntry = ledger.append(originalAction, stateBefore, stateAfter, criticResult);
 
     // Apply the correction
     const correctionTool = tools.get(criticResult.correction.tool);
     if (correctionTool) {
       const correctionStateBefore = getState();
       try {
-        const correctionOutput = await correctionTool.execute(
+        // Validate correction input through the tool's schema
+        const parsedCorrectionInput = correctionTool.inputSchema.parse(
           criticResult.correction.input
         );
+        const correctionOutput = await correctionTool.execute(parsedCorrectionInput);
         const correctionStateAfter = getState();
 
         // Log the correction
@@ -156,12 +157,23 @@ export async function executeAction(
           { verdict: "PASS", reason: "Auto-correction applied" }
         );
 
-        corrected = true;
+        // Emit correction:applied event
+        ledger.emit({
+          type: "correction:applied",
+          original: originalEntry,
+          corrected: correctionEntry,
+        });
+
         return { entry: correctionEntry, halted: false, corrected: true };
       } catch {
-        // Correction failed — log it and continue
+        // Correction failed — the original (bad) entry is already logged.
+        // Return it so the caller knows what happened.
+        return { entry: originalEntry, halted: false, corrected: false };
       }
     }
+
+    // Correction tool not found — return the original entry
+    return { entry: originalEntry, halted: false, corrected: false };
   }
 
   // 6. Log to ledger
@@ -172,7 +184,7 @@ export async function executeAction(
   const halted =
     criticResult.verdict === "FLAGGED" && (config.pauseOnFlag ?? true);
 
-  return { entry, halted, corrected };
+  return { entry, halted, corrected: false };
 }
 
 /**
@@ -213,7 +225,7 @@ export async function executeSequence(
   }
 
   // Emit session complete
-  options.ledger["emit"]({
+  options.ledger.emit({
     type: "session:complete",
     totalActions: actionsExecuted,
     totalCorrections: correctionsApplied,

@@ -18,6 +18,7 @@ import type {
   MAPEventHandler,
   MAPEvent,
 } from "./protocol.js";
+import { MAP_VERSION, MAP_PROTOCOL } from "./protocol.js";
 import { captureSnapshot, computeEntryHash } from "./snapshot.js";
 
 export class Ledger {
@@ -40,9 +41,20 @@ export class Ledger {
     };
   }
 
-  private emit(event: MAPEvent): void {
+  /**
+   * Emit an event to all listeners.
+   * Exposed for use by the executor harness. Listener errors are caught
+   * to prevent a broken handler from corrupting ledger state.
+   *
+   * @internal
+   */
+  emit(event: MAPEvent): void {
     for (const listener of this.listeners) {
-      listener(event);
+      try {
+        listener(event);
+      } catch {
+        // A broken listener must never corrupt the ledger.
+      }
     }
   }
 
@@ -189,8 +201,8 @@ export class Ledger {
     };
   } {
     return {
-      protocol: "map",
-      version: "0.1.0",
+      protocol: MAP_PROTOCOL,
+      version: MAP_VERSION,
       entries: [...this.entries],
       stats: this.getStats(),
     };

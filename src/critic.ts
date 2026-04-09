@@ -96,12 +96,11 @@ Respond with:
 
       return result.object as CriticResult;
     } catch (error) {
-      // If critic fails, default to PASS with a warning —
-      // "errors as feedback" pattern:
-      // never crash the loop, always keep moving
+      // Fail closed: a broken critic should halt, not silently approve.
+      // If the critic can't review an action, it's unsafe to proceed.
       return {
-        verdict: "PASS" as const,
-        reason: `Critic error (defaulting to PASS): ${error instanceof Error ? error.message : "Unknown error"}`,
+        verdict: "FLAGGED" as const,
+        reason: `Critic unavailable (defaulting to FLAGGED): ${error instanceof Error ? error.message : "Unknown error"}`,
       };
     }
   };

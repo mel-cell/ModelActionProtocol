@@ -20,11 +20,24 @@ export function sha256(data: string): string {
 
 /**
  * Serialize state to a deterministic string.
- * Keys are sorted to ensure identical objects produce identical hashes
- * regardless of property insertion order.
+ * Keys are sorted recursively to ensure identical objects produce identical
+ * hashes regardless of property insertion order at any nesting depth.
+ *
+ * Handles: objects (sorted), arrays (preserved), primitives, null.
+ * Note: Map, Set, BigInt, and Symbol values are not JSON-serializable
+ * and will be dropped or throw. Use a custom serializer for those types.
  */
 export function serializeState(state: unknown): string {
-  return JSON.stringify(state, Object.keys(state as object).sort());
+  return JSON.stringify(state, (_key, value) => {
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+      const sorted: Record<string, unknown> = {};
+      for (const k of Object.keys(value).sort()) {
+        sorted[k] = value[k];
+      }
+      return sorted;
+    }
+    return value;
+  });
 }
 
 /**
@@ -46,7 +59,8 @@ export function captureSnapshot(
  * This chains entries together — changing any prior entry invalidates
  * all subsequent hashes, making the ledger tamper-evident.
  *
- * Hash = SHA-256(sequence | action_json | stateBefore | stateAfter | parentHash)
+ * Uses JSON.stringify of a structured object to avoid delimiter injection.
+ * Hash = SHA-256(JSON({ sequence, action, stateBefore, stateAfter, parentHash }))
  */
 export function computeEntryHash(
   sequence: number,
@@ -55,19 +69,13 @@ export function computeEntryHash(
   stateAfter: string,
   parentHash: string
 ): string {
-  const payload = [
-    sequence.toString(),
-    JSON.stringify(action),
-    stateBefore,
-    stateAfter,
-    parentHash,
-  ].join("|");
+  const payload = JSON.stringify({ sequence, action, stateBefore, stateAfter, parentHash });
   return sha256(payload);
 }
 
 /**
  * Verify the integrity of a ledger chain.
- * Returns true if all hashes are valid and properly chained.
+ * Checks: hash correctness, chain linkage, sequence continuity, genesis validity.
  * Returns the index of the first corrupted entry if tampered.
  */
 export function verifyChain(
@@ -80,8 +88,27 @@ export function verifyChain(
     hash: string;
   }>
 ): { valid: boolean; corruptedAt?: number } {
+  const GENESIS_HASH = "0".repeat(64);
+
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
+
+    // Verify sequence continuity — no gaps or reordering
+    if (entry.sequence !== i) {
+      return { valid: false, corruptedAt: i };
+    }
+
+    // Verify genesis entry chains from the zero hash
+    if (i === 0 && entry.parentHash !== GENESIS_HASH) {
+      return { valid: false, corruptedAt: 0 };
+    }
+
+    // Verify chain linkage
+    if (i > 0 && entry.parentHash !== entries[i - 1].hash) {
+      return { valid: false, corruptedAt: i };
+    }
+
+    // Verify hash integrity
     const expectedHash = computeEntryHash(
       entry.sequence,
       entry.action,
@@ -91,11 +118,6 @@ export function verifyChain(
     );
 
     if (entry.hash !== expectedHash) {
-      return { valid: false, corruptedAt: i };
-    }
-
-    // Verify chain linkage (skip genesis entry)
-    if (i > 0 && entry.parentHash !== entries[i - 1].hash) {
       return { valid: false, corruptedAt: i };
     }
   }

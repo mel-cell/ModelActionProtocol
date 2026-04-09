@@ -214,12 +214,6 @@ export type LedgerEntry = z.infer<typeof LedgerEntry>;
 // name, description, input schema, and execution function. The schema is used
 // for validation AND can be exported as JSON for the agent's tool definitions.
 
-export const ToolDefinition = z.object({
-  name: z.string(),
-  description: z.string(),
-  inputSchema: z.instanceof(z.ZodType as any),
-});
-
 export interface MAPTool<TInput = any, TOutput = any> {
   name: string;
   description: string;
