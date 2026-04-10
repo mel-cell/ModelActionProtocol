@@ -8,6 +8,8 @@ MCP gave Claude the hands. MAP gives Claude the receipt.
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org/)
 [![Tests](https://img.shields.io/badge/Tests-58%2F58-brightgreen.svg)]()
 
+> **Building v0.2:** Solving distributed cross-API rollbacks. [Join the RFC](https://github.com/DeadpxlStudio/ModelActionProtocol/issues/1) to help architect the universal undo.
+
 ---
 
 ## The Problem
