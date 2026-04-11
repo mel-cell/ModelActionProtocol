@@ -12,6 +12,7 @@
 // =============================================================================
 
 import { z } from "zod";
+import type { LedgerStore } from "./store.js";
 
 // ─── Critic Verdicts ────────────────────────────────────────────────────────
 
@@ -256,8 +257,12 @@ export interface MAPConfig {
   pauseOnFlag?: boolean;
   /** Custom state serializer (default: JSON.stringify) */
   serializeState?: (state: unknown) => string;
-  /** Tags for AI Gateway cost attribution */
+  /** Lifecycle tags for cost attribution/tracking */
   tags?: string[];
+  /** Optional persistence adapter (SQLite, Postgres, etc) */
+  store?: LedgerStore;
+  /** Unique session ID for persistent tracking (recommended for Postgres) */
+  sessionId?: string;
 }
 
 // ─── Session Events ─────────────────────────────────────────────────────────

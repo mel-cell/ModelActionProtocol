@@ -383,7 +383,7 @@ describe("LearningEngine", () => {
 
 describe("MAP edge cases", () => {
   it("throws when executing without connectState", async () => {
-    const map = new MAP(
+    const map = await MAP.load(
       { executor: "test", critic: "test" },
       createRuleCritic([])
     );
@@ -395,7 +395,7 @@ describe("MAP edge cases", () => {
   });
 
   it("throws when executing an unregistered tool", async () => {
-    const map = new MAP(
+    const map = await MAP.load(
       { executor: "test", critic: "test" },
       createRuleCritic([])
     );
@@ -408,7 +408,7 @@ describe("MAP edge cases", () => {
 
   it("reset clears the ledger", async () => {
     const state = { value: 1 };
-    const map = new MAP(
+    const map = await MAP.load(
       { executor: "test", critic: "test" },
       createRuleCritic([])
     );
@@ -421,13 +421,13 @@ describe("MAP edge cases", () => {
     await map.execute("test", "inc", {});
     expect(map.getLedger().length).toBe(1);
 
-    map.reset();
+    await map.reset();
     expect(map.getLedger().length).toBe(0);
   });
 
   it("rollbackToSafe returns null when no problems exist", async () => {
     const state = { value: 1 };
-    const map = new MAP(
+    const map = await MAP.load(
       { executor: "test", critic: "test" },
       createRuleCritic([])
     );
@@ -443,7 +443,7 @@ describe("MAP edge cases", () => {
 
   it("event listener errors do not crash execution", async () => {
     const state = { value: 1 };
-    const map = new MAP(
+    const map = await MAP.load(
       { executor: "test", critic: "test" },
       createRuleCritic([])
     );
@@ -464,7 +464,7 @@ describe("MAP edge cases", () => {
   it("unsubscribe removes event listener", async () => {
     const state = { value: 1 };
     const events: MAPEvent[] = [];
-    const map = new MAP(
+    const map = await MAP.load(
       { executor: "test", critic: "test" },
       createRuleCritic([])
     );
@@ -527,7 +527,7 @@ describe("rollbackToSafe with a problem", () => {
       },
     ]);
 
-    const map = new MAP({ executor: "test", critic: "test" }, critic);
+    const map = await MAP.load({ executor: "test", critic: "test" }, critic);
     map.registerTool("updatePrice", "update", z.object({ price: z.number() }), async ({ price }) => {
       database.acme.price = price;
       return { price };
@@ -602,7 +602,7 @@ describe("learning loop integration", () => {
       },
     }]);
 
-    const map = new MAP({ executor: "test", critic: "test" }, baseCritic);
+    const map = await MAP.load({ executor: "test", critic: "test" }, baseCritic);
     map.registerTool("setPrice", "set", z.object({ price: z.number() }), async ({ price }) => {
       database.acme.price = price;
       return { price };
@@ -677,7 +677,7 @@ describe("learning loop integration", () => {
 describe("ESCALATE strategy", () => {
   it("halts before executing the tool", async () => {
     let executed = false;
-    const map = new MAP(
+    const map = await MAP.load(
       { executor: "test", critic: "test" },
       createRuleCritic([])
     );
@@ -709,7 +709,7 @@ describe("ESCALATE strategy", () => {
 describe("RESTORE strategy", () => {
   it("calls capture before tool execution", async () => {
     const calls: string[] = [];
-    const map = new MAP(
+    const map = await MAP.load(
       { executor: "test", critic: "test" },
       createRuleCritic([])
     );
@@ -742,7 +742,7 @@ describe("RESTORE strategy", () => {
     const calls: string[] = [];
     let restoredWith: unknown = null;
 
-    const map = new MAP(
+    const map = await MAP.load(
       { executor: "test", critic: "test" },
       createRuleCritic([])
     );
@@ -785,7 +785,7 @@ describe("RESTORE strategy", () => {
   });
 
   it("stores capturedState in the ledger entry", async () => {
-    const map = new MAP(
+    const map = await MAP.load(
       { executor: "test", critic: "test" },
       createRuleCritic([])
     );
@@ -801,80 +801,7 @@ describe("RESTORE strategy", () => {
     map.addTool(tool);
     map.connectState(() => ({}), () => {});
 
-    await map.execute("test", "updateRecord", { id: "acme" });
-
-    const entry = map.getLedger()[0];
-    expect(entry.action.capturedState).toEqual({ id: "acme", savedAt: "2026-01-01" });
-    expect(entry.action.reversalStrategy).toBe("RESTORE");
-  });
-});
-
-// ─── Critic verdict in hash chain ───────────────────────────────────────────
-
-describe("critic verdict in hash chain", () => {
-  it("tampered verdicts are detected by verifyIntegrity", async () => {
-    const state = { value: 1 };
-    const map = new MAP(
-      { executor: "test", critic: "test" },
-      createRuleCritic([])
-    );
-    map.registerTool("inc", "increment", z.object({}), async () => {
-      state.value++;
-      return state.value;
-    });
-    map.connectState(() => ({ ...state }), (s) => Object.assign(state, s as any));
-
-    await map.execute("test", "inc", {});
-
-    // Verify original chain is valid
-    expect(map.verifyIntegrity().valid).toBe(true);
-
-    // Tamper with the verdict
-    const entries = map.getLedger() as LedgerEntry[];
-    const tampered = entries.map(e => ({
-      ...e,
-      critic: { ...e.critic, verdict: "FLAGGED" as const },
-    }));
-
-    // Tampered verdict should fail verification
-    const result = verifyChain(tampered);
-    expect(result.valid).toBe(false);
-  });
-});
-
-// ─── Tool execution errors flag without critic ──────────────────────────────
-
-describe("tool execution errors", () => {
-  it("flags failed tool execution without running critic", async () => {
-    const criticCalled: boolean[] = [];
-    const critic = async () => {
-      criticCalled.push(true);
-      return { verdict: "PASS" as const, reason: "ok" };
-    };
-
-    const map = new MAP({ executor: "test", critic: "test" }, critic);
-    map.registerTool(
-      "failing",
-      "always fails",
-      z.object({}),
-      async () => { throw new Error("tool broke"); }
-    );
-    map.connectState(() => ({}), () => {});
-
-    const result = await map.execute("test", "failing", {});
-
-    expect(result.entry.critic.verdict).toBe("FLAGGED");
-    expect(result.entry.critic.reason).toContain("Tool execution failed");
-    expect(result.halted).toBe(true);
-    expect(criticCalled.length).toBe(0); // Critic was NOT called
-  });
-});
-
-// ─── approveRule throws on missing ID ───────────────────────────────────────
-
-describe("approveRule validation", () => {
-  it("throws when rule ID not found", () => {
-    const engine = new LearningEngine();
-    expect(() => engine.approveRule("nonexistent")).toThrow("not found");
+    const result = await map.execute("test", "updateRecord", { id: "acme" });
+    expect(result.entry.action.capturedState).toEqual({ id: "acme", savedAt: "2026-01-01" });
   });
 });

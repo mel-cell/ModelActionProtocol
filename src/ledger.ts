@@ -34,10 +34,28 @@ export class Ledger {
   }) {
     this.serializeState = options?.serializeState;
     this.store = options?.store;
+  }
 
-    // Load existing entries if a store is provided
+  /**
+   * Static factory to create and initialize a ledger from a persistent store.
+   * This is the recommended way to instantiate a ledger when using a store.
+   */
+  static async load(options?: { 
+    serializeState?: (state: unknown) => string,
+    store?: LedgerStore 
+  }): Promise<Ledger> {
+    const ledger = new Ledger(options);
+    await ledger.init();
+    return ledger;
+  }
+
+  /**
+   * Initialize the ledger by loading entries from the persistent store.
+   * Should be called after instantiation if not using Ledger.load().
+   */
+  async init(): Promise<void> {
     if (this.store) {
-      this.entries = this.store.getEntries();
+      this.entries = await this.store.getEntries();
     }
   }
 
@@ -76,12 +94,12 @@ export class Ledger {
    * critic's verdict. Computes the cryptographic hash chaining this
    * entry to the previous one.
    */
-  append(
+  async append(
     action: ActionRecord,
     stateBefore: unknown,
     stateAfter: unknown,
     critic: CriticResult
-  ): LedgerEntry {
+  ): Promise<LedgerEntry> {
     const sequence = this.entries.length;
     const parentHash =
       sequence > 0 ? this.entries[sequence - 1].hash : "0".repeat(64);
@@ -118,7 +136,7 @@ export class Ledger {
     this.entries.push(entry);
 
     if (this.store) {
-      this.store.append(entry);
+      await this.store.append(entry);
     }
 
     this.emit({ type: "action:complete", entry });
@@ -136,7 +154,7 @@ export class Ledger {
    * Append a rollback entry to the ledger (the rollback itself is provenance).
    * Returns the state snapshot from before the target entry.
    */
-  rollbackTo(targetId: string): { state: unknown; entriesReverted: number } {
+  async rollbackTo(targetId: string): Promise<{ state: unknown; entriesReverted: number }> {
     const targetIdx = this.entries.findIndex((e) => e.id === targetId);
     if (targetIdx === -1) {
       throw new Error(`Ledger entry ${targetId} not found`);
@@ -152,7 +170,7 @@ export class Ledger {
         this.entries[i] = { ...this.entries[i], status: "ROLLED_BACK" };
         
         if (this.store) {
-          this.store.updateStatus(this.entries[i].id, "ROLLED_BACK");
+          await this.store.updateStatus(this.entries[i].id, "ROLLED_BACK");
         }
 
         reverted++;
@@ -172,7 +190,7 @@ export class Ledger {
       .find((e) => e.status === "ACTIVE" && e.action.tool !== "ROLLBACK");
     const currentState = lastCommitted?.snapshots.after ?? target.snapshots.before;
 
-    this.append(
+    await this.append(
       rollbackAction,
       currentState,
       target.snapshots.before,
@@ -261,10 +279,10 @@ export class Ledger {
    * WARNING: This destroys the audit trail irreversibly.
    * @internal
    */
-  clear(): void {
+  async clear(): Promise<void> {
     this.entries = [];
     if (this.store) {
-      this.store.clear();
+      await this.store.clear();
     }
   }
 }

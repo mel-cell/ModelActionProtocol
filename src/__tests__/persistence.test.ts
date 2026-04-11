@@ -21,19 +21,20 @@ describe("SQLite Persistence", () => {
     }
   });
 
-  it("should persist entries across restarts", () => {
+  it("should persist entries across restarts", async () => {
     const store = new SQLiteLedgerStore(dbPath);
     const ledger = new Ledger({ store });
+    await ledger.init();
 
     // 1. Add some entries
-    ledger.append(
+    await ledger.append(
       { tool: "testTool", input: { item: "A" }, output: { success: true } },
       { count: 0 },
       { count: 1 },
       { verdict: "PASS", reason: "All good" }
     );
 
-    ledger.append(
+    await ledger.append(
       { tool: "testTool", input: { item: "B" }, output: { success: true } },
       { count: 1 },
       { count: 2 },
@@ -46,8 +47,9 @@ describe("SQLite Persistence", () => {
     store.close();
 
     // 2. Restart ledger with the same database
+    // Pro: Using static Ledger.load() factory
     const store2 = new SQLiteLedgerStore(dbPath);
-    const ledger2 = new Ledger({ store: store2 });
+    const ledger2 = await Ledger.load({ store: store2 });
 
     const entries = ledger2.getEntries();
     expect(entries.length).toBe(2);
@@ -58,22 +60,22 @@ describe("SQLite Persistence", () => {
     store2.close();
   });
 
-  it("should persist rollback status across restarts", () => {
+  it("should persist rollback status across restarts", async () => {
     const store = new SQLiteLedgerStore(dbPath);
-    const ledger = new Ledger({ store });
+    const ledger = await Ledger.load({ store });
 
-    const entry1 = ledger.append(
+    const entry1 = await ledger.append(
       { tool: "testTool", input: { v: 1 }, output: { ok: true } },
       {}, {}, { verdict: "PASS", reason: "X" }
     );
 
-    ledger.append(
+    await ledger.append(
       { tool: "testTool", input: { v: 2 }, output: { ok: true } },
       {}, {}, { verdict: "PASS", reason: "X" }
     );
 
     // Rollback to entry 1
-    ledger.rollbackTo(entry1.id);
+    await ledger.rollbackTo(entry1.id);
 
     expect(ledger.getEntries().length).toBe(3); // 2 actions + 1 rollback entry
     expect(ledger.getEntry(entry1.id)?.status).toBe("ROLLED_BACK");
@@ -82,7 +84,7 @@ describe("SQLite Persistence", () => {
 
     // Restart
     const store2 = new SQLiteLedgerStore(dbPath);
-    const ledger2 = new Ledger({ store: store2 });
+    const ledger2 = await Ledger.load({ store: store2 });
 
     const entries = ledger2.getEntries();
     expect(entries.length).toBe(3);
@@ -91,29 +93,29 @@ describe("SQLite Persistence", () => {
     store2.close();
   });
 
-  it("should clear database on clear()", () => {
+  it("should clear database on clear()", async () => {
     const store = new SQLiteLedgerStore(dbPath);
-    const ledger = new Ledger({ store });
+    const ledger = await Ledger.load({ store });
 
-    ledger.append(
+    await ledger.append(
       { tool: "test", input: {}, output: {} },
       {}, {}, { verdict: "PASS", reason: "X" }
     );
 
     expect(ledger.getEntries().length).toBe(1);
-    ledger.clear();
+    await ledger.clear();
     expect(ledger.getEntries().length).toBe(0);
 
     store.close();
 
     // Restart should be empty
     const store2 = new SQLiteLedgerStore(dbPath);
-    const ledger2 = new Ledger({ store: store2 });
+    const ledger2 = await Ledger.load({ store: store2 });
     expect(ledger2.getEntries().length).toBe(0);
     store2.close();
   });
 
-  it("should enforce UNIQUE constraint on sequence", () => {
+  it("should enforce UNIQUE constraint on sequence", async () => {
     const store = new SQLiteLedgerStore(dbPath);
     
     // Create an entry manually
@@ -131,12 +133,13 @@ describe("SQLite Persistence", () => {
       status: "ACTIVE"
     };
 
-    store.append(entry);
+    await store.append(entry);
 
     // Try to append another entry with same sequence
     const entry2 = { ...entry, id: "uuid-2" };
     
-    expect(() => store.append(entry2)).toThrow(/Duplicate sequence number detected/);
+    // Check error message matches our "Pro" implementation
+    await expect(() => store.append(entry2)).rejects.toThrow(/Duplicate sequence number detected/);
     
     store.close();
   });

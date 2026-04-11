@@ -76,7 +76,7 @@ export async function executeAction(
   toolName: string,
   input: Record<string, unknown>
 ): Promise<{
-  entry: ReturnType<Ledger["append"]>;
+  entry: Awaited<ReturnType<Ledger["append"]>>;
   halted: boolean;
   corrected: boolean;
 }> {
@@ -99,7 +99,7 @@ export async function executeAction(
       output: { pending: true, reason: "ESCALATE: awaiting human approval" },
       reversalStrategy: "ESCALATE",
     };
-    const entry = ledger.append(action, stateBefore, stateBefore, {
+    const entry = await ledger.append(action, stateBefore, stateBefore, {
       verdict: "FLAGGED",
       reason: `Action "${toolName}" requires human approval (ESCALATE strategy)`,
     });
@@ -139,7 +139,7 @@ export async function executeAction(
   // 3b. If the tool itself errored, flag it without running the critic
   if (executionError) {
     const action: ActionRecord = { tool: toolName, input, output };
-    const entry = ledger.append(action, stateBefore, stateAfter, {
+    const entry = await ledger.append(action, stateBefore, stateAfter, {
       verdict: "FLAGGED",
       reason: `Tool execution failed: ${(output as any).message}`,
     });
@@ -172,7 +172,7 @@ export async function executeAction(
       reversalStrategy: tool.reversal?.strategy,
       capturedState,
     };
-    const originalEntry = ledger.append(originalAction, stateBefore, stateAfter, criticResult);
+    const originalEntry = await ledger.append(originalAction, stateBefore, stateAfter, criticResult);
 
     // Apply the correction
     const correctionTool = tools.get(criticResult.correction.tool);
@@ -192,7 +192,7 @@ export async function executeAction(
           input: criticResult.correction.input,
           output: correctionOutput,
         };
-        const correctionEntry = ledger.append(
+        const correctionEntry = await ledger.append(
           correctionAction,
           correctionStateBefore,
           correctionStateAfter,
@@ -224,7 +224,7 @@ export async function executeAction(
     reversalStrategy: tool.reversal?.strategy,
     capturedState,
   };
-  const entry = ledger.append(action, stateBefore, stateAfter, criticResult);
+  const entry = await ledger.append(action, stateBefore, stateAfter, criticResult);
 
   // 7. Check if we should halt
   const halted =

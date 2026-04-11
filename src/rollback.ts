@@ -37,10 +37,10 @@ export interface RollbackResult {
  * to their environment. MAP captures the intent and provenance;
  * the application layer handles the mutation.
  */
-export function executeRollback(
+export async function executeRollback(
   ledger: Ledger,
   targetId: string
-): RollbackResult {
+): Promise<RollbackResult> {
   const entry = ledger.getEntry(targetId);
   if (!entry) {
     throw new Error(`Cannot rollback: entry ${targetId} not found`);
@@ -52,7 +52,7 @@ export function executeRollback(
     );
   }
 
-  const { state, entriesReverted } = ledger.rollbackTo(targetId);
+  const { state, entriesReverted } = await ledger.rollbackTo(targetId);
 
   // The rollback entry is the last one appended by ledger.rollbackTo()
   const entries = ledger.getEntries();

@@ -13,6 +13,7 @@ export { MAP } from "./map.js";
 // Ledger
 export { Ledger } from "./ledger.js";
 export type { LedgerStore } from "./store.js";
+export type { PostgresLedgerStore } from "./adapters/postgres.js";
 
 // Critic
 export { createLLMCritic, createRuleCritic, createTieredCritic, defaultRiskClassifier } from "./critic.js";

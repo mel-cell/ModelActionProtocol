@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
-import type { LedgerStore } from "../store.js";
 import { LedgerEntry, type LedgerEntryStatus } from "../protocol.js";
+import type { LedgerStore } from "../store.js";
 
 /**
  * SQLite implementation of the LedgerStore.
@@ -74,11 +74,7 @@ export class SQLiteLedgerStore implements LedgerStore {
     `);
   }
 
-  /**
-   * Appends an entry to the store. 
-   * Uses a transaction if you were to append multiple, but here it's atomic by default.
-   */
-  append(entry: LedgerEntry): void {
+  async append(entry: LedgerEntry): Promise<void> {
     try {
       this.statements.insert.run(
         entry.id,
@@ -106,35 +102,30 @@ export class SQLiteLedgerStore implements LedgerStore {
     }
   }
 
-  getEntries(): LedgerEntry[] {
+  async getEntries(): Promise<LedgerEntry[]> {
     const rows = this.statements.selectAll.all();
     return rows.map((row: any) => this.mapRowToEntry(row));
   }
 
-  getEntry(id: string): LedgerEntry | undefined {
+  async getEntry(id: string): Promise<LedgerEntry | undefined> {
     const row = this.statements.selectById.get(id);
     return row ? this.mapRowToEntry(row) : undefined;
   }
 
-  updateStatus(id: string, status: LedgerEntryStatus): void {
+  async updateStatus(id: string, status: LedgerEntryStatus): Promise<void> {
     const result = this.statements.updateStatus.run(status, id);
     if (result.changes === 0) {
       throw new Error(`MAP SQLiteStore: Entry with ID ${id} not found for status update.`);
     }
   }
 
-  clear(): void {
-    // Wrapping in a transaction for safety
+  async clear(): Promise<void> {
     const clearAll = this.db.transaction(() => {
       this.statements.delete.run();
     });
     clearAll();
   }
 
-  /**
-   * Maps a database row back to a typed LedgerEntry.
-   * Performs Zod validation to ensure the data hasn't been corrupted at rest.
-   */
   private mapRowToEntry(row: any): LedgerEntry {
     try {
       const data = {
@@ -156,7 +147,6 @@ export class SQLiteLedgerStore implements LedgerStore {
         stateVersion: row.stateVersion || undefined,
       };
 
-      // Validate data from disk against the protocol schema
       return LedgerEntry.parse(data);
     } catch (error) {
       throw new Error(`MAP SQLiteStore: Corruption detected in ledger entry ${row.id}. Data does not match protocol schema.`);

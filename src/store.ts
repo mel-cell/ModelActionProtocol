@@ -10,17 +10,17 @@ import type { LedgerEntry, LedgerEntryStatus } from "./protocol.js";
  */
 export interface LedgerStore {
   /** Append a new entry to the store */
-  append(entry: LedgerEntry): void;
+  append(entry: LedgerEntry): Promise<void>;
   
   /** Retrieve all entries from the store */
-  getEntries(): LedgerEntry[];
+  getEntries(): Promise<LedgerEntry[]>;
   
   /** Retrieve a single entry by ID */
-  getEntry(id: string): LedgerEntry | undefined;
+  getEntry(id: string): Promise<LedgerEntry | undefined>;
   
   /** Update the status of an existing entry (e.g., mark as ROLLED_BACK) */
-  updateStatus(id: string, status: LedgerEntryStatus): void;
+  updateStatus(id: string, status: LedgerEntryStatus): Promise<void>;
   
   /** Clear all entries from the store */
-  clear(): void;
+  clear(): Promise<void>;
 }

@@ -3,11 +3,11 @@
 //
 // The public API for @model-action-protocol/core. Three concepts: register tools, run, rollback.
 //
-//   const map = new MAP({ executor: 'sonnet', critic: 'haiku' });
+//   const map = await MAP.load({ executor: 'sonnet', critic: 'haiku' });
 //   map.registerTool('updateRecord', schema, fn);
 //   const session = await map.run({ goal: '...', actions: [...] });
-//   session.rollbackTo(entryId);
-//   session.exportLedger();
+//   await map.rollbackTo(entryId);
+//   map.exportLedger();
 //
 // The protocol is MAP. The rollback is the moat.
 // =============================================================================
@@ -38,7 +38,25 @@ export class MAP {
     this.critic = critic;
     this.ledger = new Ledger({
       serializeState: config.serializeState,
+      store: config.store,
     });
+  }
+
+  /**
+   * Static factory to create and initialize a MAP instance.
+   * Recommended way to instantiate if using a persistent store.
+   */
+  static async load(config: MAPConfig, critic: CriticFunction): Promise<MAP> {
+    const map = new MAP(config, critic);
+    await map.init();
+    return map;
+  }
+
+  /**
+   * Initialize the MAP instance (loads ledger from store).
+   */
+  async init(): Promise<void> {
+    await this.ledger.init();
   }
 
   // ─── Tool Registration ──────────────────────────────────────────────────
@@ -159,7 +177,7 @@ export class MAP {
     entriesReverted: number;
   }> {
     this.assertConnected();
-    const result = executeRollback(this.ledger, entryId);
+    const result = await executeRollback(this.ledger, entryId);
 
     // Apply the restored in-memory state
     this.stateSetter!(result.state);
@@ -253,8 +271,8 @@ export class MAP {
   /**
    * Reset the session (clear ledger and state).
    */
-  reset(): void {
-    this.ledger.clear();
+  async reset(): Promise<void> {
+    await this.ledger.clear();
   }
 
   // ─── Internal ───────────────────────────────────────────────────────────

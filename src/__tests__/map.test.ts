@@ -72,9 +72,9 @@ const testCritic = createRuleCritic([
 describe("@model-action-protocol/core", () => {
   let map: MAP;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     resetDatabase();
-    map = new MAP(
+    map = await MAP.load(
       { executor: "test/executor", critic: "test/critic" },
       testCritic
     );
