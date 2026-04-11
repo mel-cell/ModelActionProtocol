@@ -14,9 +14,6 @@ export { MAP } from "./map.js";
 export { Ledger } from "./ledger.js";
 export type { LedgerStore } from "./store.js";
 
-// Adapters
-export { SQLiteLedgerStore } from "./adapters/sqlite.js";
-
 // Critic
 export { createLLMCritic, createRuleCritic, createTieredCritic, defaultRiskClassifier } from "./critic.js";
 export type { CriticFunction, RiskTier, RiskClassifier } from "./critic.js";

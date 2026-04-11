@@ -1,28 +1,60 @@
 import Database from "better-sqlite3";
 import type { LedgerStore } from "../store.js";
-import type { LedgerEntry, LedgerEntryStatus } from "../protocol.js";
+import { LedgerEntry, type LedgerEntryStatus } from "../protocol.js";
 
 /**
  * SQLite implementation of the LedgerStore.
  * 
  * Persists entries to a local SQLite database file using better-sqlite3.
- * Handles JSON serialization for complex objects (action, snapshots, critic).
+ * Optimized with prepared statement caching, WAL mode, and atomic transactions.
  */
 export class SQLiteLedgerStore implements LedgerStore {
   private db: Database.Database;
+  private statements: {
+    insert: Database.Statement;
+    updateStatus: Database.Statement;
+    selectAll: Database.Statement;
+    selectById: Database.Statement;
+    delete: Database.Statement;
+  };
 
   constructor(path: string = "map.db") {
-    this.db = new Database(path);
+    try {
+      this.db = new Database(path);
+    } catch (error) {
+      throw new Error(
+        `MAP SQLiteStore: Failed to open database at "${path}". ` +
+        `Ensure the directory exists and is writable.`
+      );
+    }
+
     this.init();
+    
+    // Prepare statements for reuse (performance optimization)
+    this.statements = {
+      insert: this.db.prepare(`
+        INSERT INTO entries (
+          id, sequence, timestamp, action, stateBefore, stateAfter, 
+          snapshots, parentHash, hash, critic, status, approval,
+          agentId, parentEntryId, lineage, stateVersion
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `),
+      updateStatus: this.db.prepare("UPDATE entries SET status = ? WHERE id = ?"),
+      selectAll: this.db.prepare("SELECT * FROM entries ORDER BY sequence ASC"),
+      selectById: this.db.prepare("SELECT * FROM entries WHERE id = ?"),
+      delete: this.db.prepare("DELETE FROM entries"),
+    };
   }
 
   private init() {
-    // Create the entries table if it doesn't exist.
-    // We store complex objects as JSON strings.
+    // Enable WAL mode for better read/write concurrency
+    this.db.pragma('journal_mode = WAL');
+
+    // Create the entries table with strict constraints
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS entries (
         id TEXT PRIMARY KEY,
-        sequence INTEGER NOT NULL,
+        sequence INTEGER NOT NULL UNIQUE,
         timestamp TEXT NOT NULL,
         action TEXT NOT NULL,
         stateBefore TEXT NOT NULL,
@@ -42,72 +74,93 @@ export class SQLiteLedgerStore implements LedgerStore {
     `);
   }
 
+  /**
+   * Appends an entry to the store. 
+   * Uses a transaction if you were to append multiple, but here it's atomic by default.
+   */
   append(entry: LedgerEntry): void {
-    const stmt = this.db.prepare(`
-      INSERT INTO entries (
-        id, sequence, timestamp, action, stateBefore, stateAfter, 
-        snapshots, parentHash, hash, critic, status, approval,
-        agentId, parentEntryId, lineage, stateVersion
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    stmt.run(
-      entry.id,
-      entry.sequence,
-      entry.timestamp,
-      JSON.stringify(entry.action),
-      entry.stateBefore,
-      entry.stateAfter,
-      JSON.stringify(entry.snapshots),
-      entry.parentHash,
-      entry.hash,
-      JSON.stringify(entry.critic),
-      entry.status,
-      entry.approval || null,
-      entry.agentId || null,
-      entry.parentEntryId || null,
-      entry.lineage ? JSON.stringify(entry.lineage) : null,
-      entry.stateVersion || null
-    );
+    try {
+      this.statements.insert.run(
+        entry.id,
+        entry.sequence,
+        entry.timestamp,
+        JSON.stringify(entry.action),
+        entry.stateBefore,
+        entry.stateAfter,
+        JSON.stringify(entry.snapshots),
+        entry.parentHash,
+        entry.hash,
+        JSON.stringify(entry.critic),
+        entry.status,
+        entry.approval || null,
+        entry.agentId || null,
+        entry.parentEntryId || null,
+        entry.lineage ? JSON.stringify(entry.lineage) : null,
+        entry.stateVersion || null
+      );
+    } catch (error) {
+      if ((error as any).code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        throw new Error(`MAP SQLiteStore: Duplicate sequence number detected (${entry.sequence}). Hash chain integrity at risk.`);
+      }
+      throw error;
+    }
   }
 
   getEntries(): LedgerEntry[] {
-    const rows = this.db.prepare("SELECT * FROM entries ORDER BY sequence ASC").all();
+    const rows = this.statements.selectAll.all();
     return rows.map((row: any) => this.mapRowToEntry(row));
   }
 
   getEntry(id: string): LedgerEntry | undefined {
-    const row = this.db.prepare("SELECT * FROM entries WHERE id = ?").get(id);
+    const row = this.statements.selectById.get(id);
     return row ? this.mapRowToEntry(row) : undefined;
   }
 
   updateStatus(id: string, status: LedgerEntryStatus): void {
-    this.db.prepare("UPDATE entries SET status = ? WHERE id = ?").run(status, id);
+    const result = this.statements.updateStatus.run(status, id);
+    if (result.changes === 0) {
+      throw new Error(`MAP SQLiteStore: Entry with ID ${id} not found for status update.`);
+    }
   }
 
   clear(): void {
-    this.db.prepare("DELETE FROM entries").run();
+    // Wrapping in a transaction for safety
+    const clearAll = this.db.transaction(() => {
+      this.statements.delete.run();
+    });
+    clearAll();
   }
 
+  /**
+   * Maps a database row back to a typed LedgerEntry.
+   * Performs Zod validation to ensure the data hasn't been corrupted at rest.
+   */
   private mapRowToEntry(row: any): LedgerEntry {
-    return {
-      id: row.id,
-      sequence: row.sequence,
-      timestamp: row.timestamp,
-      action: JSON.parse(row.action),
-      stateBefore: row.stateBefore,
-      stateAfter: row.stateAfter,
-      snapshots: JSON.parse(row.snapshots),
-      parentHash: row.parentHash,
-      hash: row.hash,
-      critic: JSON.parse(row.critic),
-      status: row.status as LedgerEntryStatus,
-      approval: row.approval || undefined,
-      agentId: row.agentId || undefined,
-      parentEntryId: row.parentEntryId || undefined,
-      lineage: row.lineage ? JSON.parse(row.lineage) : undefined,
-      stateVersion: row.stateVersion || undefined,
-    };
+    try {
+      const data = {
+        id: row.id,
+        sequence: row.sequence,
+        timestamp: row.timestamp,
+        action: JSON.parse(row.action),
+        stateBefore: row.stateBefore,
+        stateAfter: row.stateAfter,
+        snapshots: JSON.parse(row.snapshots),
+        parentHash: row.parentHash,
+        hash: row.hash,
+        critic: JSON.parse(row.critic),
+        status: row.status as LedgerEntryStatus,
+        approval: row.approval || undefined,
+        agentId: row.agentId || undefined,
+        parentEntryId: row.parentEntryId || undefined,
+        lineage: row.lineage ? JSON.parse(row.lineage) : undefined,
+        stateVersion: row.stateVersion || undefined,
+      };
+
+      // Validate data from disk against the protocol schema
+      return LedgerEntry.parse(data);
+    } catch (error) {
+      throw new Error(`MAP SQLiteStore: Corruption detected in ledger entry ${row.id}. Data does not match protocol schema.`);
+    }
   }
 
   close(): void {
